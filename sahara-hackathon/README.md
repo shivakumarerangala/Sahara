@@ -130,18 +130,10 @@ Point `API_BASE` in `frontend/sahara.jsx` at the proxy (default `http://localhos
 - **Sahara is not an emergency service** and says so persistently. In immediate danger: **112**.
 - A production deployment would add: counselor-in-the-loop escalation with a partner NGO, DPDP Act-compliant data handling, penetration testing of the disguise, and regional-language voice input.
 
-## Demo video script (3 min)
-
-1. (0:00) The problem in two sentences over NFHS statistic.
-2. (0:20) Calculator on screen — "this is the app." Unlock live.
-3. (0:40) Fictional low-risk incident → validation + cited PWDVA rights; zoom on the citation.
-4. (1:30) Fictional high-risk incident (threat + strangulation) → urgent 112/181 banner; explain triage indicators.
-5. (2:10) Records tab — the evidence pattern; delete control.
-6. (2:30) Architecture slide: three reasoning steps + Foundry IQ retrieval activity.
-7. (2:50) Quick exit (Esc) back to calculator. "Help that can't be found by the wrong person."
+ 
 
 ## Team
-*(add names / Innovation Studio profile links)*
+*Shivakumar.Erangala*
 
 ## License
 MIT — built for the Agents League Hackathon 2026.
