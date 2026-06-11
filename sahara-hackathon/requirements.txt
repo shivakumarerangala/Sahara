@@ -1,0 +1,6 @@
+azure-ai-projects
+azure-identity
+fastapi
+uvicorn
+openai
+httpx
