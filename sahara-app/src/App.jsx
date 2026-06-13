@@ -59,18 +59,25 @@ const sans = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 // ——— Calculator disguise ———————————————————————————
 // The whole app lives behind a real, working calculator.
 // Typing the unlock code (0000) and pressing = opens Sahara.
+// Unlock code for the demo. Real deployment would use a user-set secret.
+const UNLOCK_CODE = "1234";
+
 function Calculator({ onUnlock }) {
   const [display, setDisplay] = useState("0");
   const [expr, setExpr] = useState("");
+  // Track raw keystrokes separately so the unlock code is detected
+  // regardless of how the display formats numbers.
+  const [keystrokes, setKeystrokes] = useState("");
 
   const press = (k) => {
     if (k === "C") {
       setDisplay("0");
       setExpr("");
+      setKeystrokes("");
       return;
     }
     if (k === "=") {
-      if (expr === "0000" || display === "0000") {
+      if (keystrokes === UNLOCK_CODE) {
         onUnlock();
         return;
       }
@@ -86,10 +93,12 @@ function Calculator({ onUnlock }) {
         setDisplay("Error");
         setExpr("");
       }
+      setKeystrokes("");
       return;
     }
-    const next = expr === "0" || display === "Error" ? k : expr + k;
-    setExpr(next);
+    setKeystrokes((prev) => (prev + k).slice(-12)); // remember recent digits
+    const next = display === "0" || display === "Error" ? k : display + k;
+    setExpr(expr === "" || display === "Error" ? k : expr + k);
     setDisplay(next);
   };
 
@@ -122,7 +131,7 @@ function Calculator({ onUnlock }) {
         </div>
         {/* Prototype-only hint. A real deployment would never show this. */}
         <p className="text-center mt-6" style={{ color: "#5A5A5E", fontSize: 12 }}>
-          Prototype hint: type <span style={{ color: "#8E8E93" }}>0000</span> then <span style={{ color: "#8E8E93" }}>=</span>
+          Prototype hint: type <span style={{ color: "#8E8E93" }}>1234</span> then <span style={{ color: "#8E8E93" }}>=</span>
         </p>
       </div>
     </div>
