@@ -3,7 +3,7 @@ setup_agent.py — creates (or updates) the Sahara agent on Microsoft Foundry,
 connected to a Foundry IQ knowledge base via MCP.
 
 Prereqs:
-  pip install azure-ai-projects azure-identity
+  pip install azure-ai-projects azure-identity python-dotenv
   az login   (DefaultAzureCredential picks up your session)
 
 Env vars:
@@ -16,9 +16,13 @@ Env vars:
 
 import os
 
+from dotenv import load_dotenv
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition, MCPTool
 from azure.identity import DefaultAzureCredential
+
+# Load environment variables from .env file
+load_dotenv()
 
 AGENT_NAME = os.environ.get("AGENT_NAME", "sahara-agent")
 
@@ -29,7 +33,7 @@ PROJECT_CONNECTION_NAME = os.environ["PROJECT_CONNECTION_NAME"]
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "gpt-4.1-mini")
 
 MCP_ENDPOINT = (
-    f"{SEARCH_ENDPOINT}/knowledgebases/{KB_NAME}/mcp"
+    f"{SEARCH_ENDPOINT.rstrip('/')}/knowledgebases/{KB_NAME}/mcp"
     "?api-version=2026-05-01-preview"
 )
 

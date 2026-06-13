@@ -6,20 +6,22 @@ DefaultAzureCredential and invokes the agent through the project's OpenAI-
 compatible Responses API with an agent_reference.
 
 Run:
-  pip install fastapi uvicorn azure-ai-projects azure-identity openai
-  export PROJECT_ENDPOINT="https://<resource>.services.ai.azure.com/api/projects/<project>"
-  export AGENT_NAME="sahara-agent"
+  pip install fastapi uvicorn azure-ai-projects azure-identity openai python-dotenv
   uvicorn server:app --reload --port 8000
 """
 
 import json
 import os
 
+from dotenv import load_dotenv
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+# Load environment variables from .env file
+load_dotenv()
 
 PROJECT_ENDPOINT = os.environ["PROJECT_ENDPOINT"]
 AGENT_NAME = os.environ.get("AGENT_NAME", "sahara-agent")

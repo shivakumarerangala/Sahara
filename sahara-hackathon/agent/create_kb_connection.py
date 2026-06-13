@@ -42,7 +42,12 @@ try:
 except ImportError:
     pass
 
-PROJECT_RESOURCE_ID = os.environ["PROJECT_RESOURCE_ID"]
+PROJECT_RESOURCE_ID = os.environ["PROJECT_RESOURCE_ID"].strip()
+# Ensure the ARM resource id begins with a leading slash so URL joining
+# with https://management.azure.com doesn't accidentally merge into
+# the hostname (producing management.azure.comsubscriptions...).
+if not PROJECT_RESOURCE_ID.startswith("/"):
+    PROJECT_RESOURCE_ID = "/" + PROJECT_RESOURCE_ID
 SEARCH_ENDPOINT = os.environ["SEARCH_ENDPOINT"].rstrip("/")
 KB_NAME = os.environ["KB_NAME"]
 CONNECTION_NAME = os.environ.get("KB_CONNECTION_NAME", "sahara-kb-mcp")
