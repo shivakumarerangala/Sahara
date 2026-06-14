@@ -26,29 +26,7 @@ The most dangerous moment for a survivor is when her abuser discovers she is see
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Device["Survivor's phone / browser"]
-        CALC["Calculator disguise<br/>(unlock code + quick exit)"] --> UI["Sahara React app"]
-    end
-
-    UI -->|"incident text (anonymous)"| API["FastAPI proxy<br/>(server.py)"]
-
-    subgraph Foundry["Microsoft Foundry"]
-        API -->|"Responses API +<br/>agent_reference"| AGENT["Sahara Agent<br/>(Foundry Agent Service)<br/>triage → retrieve → respond"]
-        AGENT <-->|"MCP: knowledge_base_retrieve"| KB["Foundry IQ knowledge base<br/>(Azure AI Search agentic retrieval)"]
-    end
-
-    subgraph Corpus["Azure Blob Storage corpus"]
-        PWDVA["PWDVA 2005 full text"]
-        BNS["BNS sections"]
-        OSC["One Stop Centre directory"]
-        SAFE["Helplines & safety planning"]
-    end
-
-    KB --- Corpus
-    AGENT -->|"JSON: acknowledgment, risk,<br/>cited rights, next steps"| API --> UI
-```
+ 
 
 **Why Foundry IQ is central, not bolted on:** the knowledge base's agentic retrieval plans subqueries, runs them in parallel, semantically reranks, and returns extractive passages **with citations** — so every legal statement Sahara makes traces back to the statute itself. The agent's instructions forbid answering legal questions from model memory.
 
@@ -68,59 +46,94 @@ flowchart LR
 ```
 sahara-hackathon/
 ├── README.md                  ← you are here
+├── LICENSE                    ← MIT
+├── corpus/                    ← what grounds the agent (Foundry IQ sources)
+│   ├── legal-rights-and-safety-planning.md
+│   └── helplines-and-services-india.md
+│   (upload these + the official PWDVA 2005 PDF from indiacode.nic.in)
+├── infra/
+│   └── search.bicep           ← Azure AI Search service (semantic ranker enabled)
 ├── agent/
 │   ├── setup_agent.py         ← creates the Sahara agent + Foundry IQ MCP tool
+│   ├── create_kb_connection.py← creates the managed-identity KB connection
 │   ├── server.py              ← FastAPI proxy the app frontend calls
-│   └── whatsapp_bot.py        ← WhatsApp Cloud API webhook → same agent
+│   └── whatsapp_bot.py        ← WhatsApp Cloud API webhook → same agent (roadmap)
 └── frontend/
-    └── sahara.jsx             ← React app (calculator disguise, talk, records, help)
+    ├── App.jsx                ← React app (calculator disguise, talk, records, help)
+    ├── sahara.css             ← styles (no Tailwind needed)
+    └── main.jsx               ← Vite entry point
 ```
 
 **One agent, two front doors.** The disguised app serves women who need ongoing
-stealth and an evidence journal; the WhatsApp channel serves instant first
-contact with zero install (reply *HELP* for hotlines, message anything to be
-heard). The WhatsApp bot persists nothing, never messages first, and teaches
-its own safety (disappearing messages, chat delete) in every reply — because a
-WhatsApp chat, unlike the calculator, cannot hide.
+stealth and an evidence journal; a WhatsApp channel (roadmap) would serve instant
+first contact with zero install. Both call the *same* Foundry agent, so the
+safety principle — grounded or silent — never changes between channels.
 
 ## Setup
 
 ### 0. Prerequisites
-- Azure subscription with a **Microsoft Foundry project** and a deployed chat model (e.g. `gpt-4.1-mini`)
-- **Azure AI Search** service (Basic tier or above) with a **Foundry IQ knowledge base**
+- Azure subscription with a **Microsoft Foundry project** and a deployed chat model (`gpt-4.1-mini`, Global Standard)
+- **Azure AI Search** in a region supporting semantic ranker + agentic retrieval (this build uses **Central India**; South India does **not** support it)
 - Python 3.10+, Node 18+
-- `az login` with access to the Foundry project (the agent uses `DefaultAzureCredential`)
+- `az login` with access to the project (everything authenticates via `DefaultAzureCredential` / managed identity — no API keys in code)
 
 ### 1. Build the knowledge base (Foundry IQ)
-1. Create an Azure Blob Storage container and upload the corpus:
-   - PWDVA 2005 full text (public, from indiacode.nic.in)
-   - Relevant BNS sections (e.g. cruelty by husband or relatives)
-   - One Stop Centre / Sakhi directory and 181/112/1091 helpline guide
-   - A safety-planning and evidence-documentation guide
-2. In the Foundry portal (or Azure AI Search), create a **knowledge source** over the container, then a **knowledge base** — chunking, embeddings, and indexing are automated.
-3. Note your search endpoint and knowledge base name. The agent connects over MCP at:
-   `https://<search-name>.search.windows.net/knowledgebases/<kb-name>/mcp?api-version=2026-05-01-preview`
+1. Create an Azure Blob Storage container and upload the corpus: the official **PWDVA 2005** PDF (indiacode.nic.in) plus the two markdown guides in `/corpus`.
+2. Create the search service (`infra/search.bicep` enables semantic ranker at creation, or use the portal — set Semantic ranker to **Free**).
+3. In the portal: create a **knowledge source** over the container, then a **knowledge base** named `sahara-law-kb`, and attach a chat-completion model deployment. Wait for the source to show **Active** before querying.
+4. On the search service: **Settings → Keys → API access control = Both**, and under **Access control (IAM)** assign **Search Index Data Reader** to the Foundry **project's managed identity** (enable the project's system-assigned identity first).
 
-### 2. Create the agent
-```bash
-pip install azure-ai-projects azure-identity
-export PROJECT_ENDPOINT="https://<resource>.services.ai.azure.com/api/projects/<project>"
-export SEARCH_ENDPOINT="https://<search-name>.search.windows.net"
-export KB_NAME="sahara-law-kb"
-export PROJECT_CONNECTION_NAME="<your search connection name>"
-export AGENT_MODEL="gpt-4.1-mini"
-python agent/setup_agent.py
+### 2. Configure environment
+Create `.env` in the repo root (git-ignored — never commit it):
+```
+PROJECT_ENDPOINT=https://<resource>.services.ai.azure.com/api/projects/<project>
+PROJECT_RESOURCE_ID=/subscriptions/.../projects/<project>   # Azure portal → project → JSON View → "id"
+SEARCH_ENDPOINT=https://<search-name>.search.windows.net    # no trailing slash
+KB_NAME=sahara-law-kb
+KB_CONNECTION_NAME=sahara-kb-mcp
+PROJECT_CONNECTION_NAME=sahara-kb-mcp
+AGENT_MODEL=gpt-4.1-mini
+AGENT_NAME=sahara-agent
 ```
 
-### 3. Run the backend proxy
+### 3. Create the KB connection and the agent
 ```bash
-pip install fastapi uvicorn azure-ai-projects azure-identity openai
-export AGENT_NAME="sahara-agent"
-uvicorn agent.server:app --reload --port 8000
-```
+pip install azure-ai-projects azure-identity python-dotenv requests fastapi uvicorn openai
+az login
 
-### 4. Run the frontend
-Point `API_BASE` in `frontend/sahara.jsx` at the proxy (default `http://localhost:8000`) and run it in any React + Tailwind dev setup (e.g. Vite). Unlock code for the demo build: `0000` then `=`.
+python agent/create_kb_connection.py   # managed-identity connection to the KB's MCP endpoint
+python agent/setup_agent.py             # the agent, wired to that connection
+```
+> **Why managed identity, not an API key:** the Foundry IQ knowledge base MCP
+> tool rejects key-based auth (401). The connection must be a `RemoteTool`
+> connection with `ProjectManagedIdentity`, and the project's identity needs
+> the **Search Index Data Reader** role on the search service. This was the
+> single biggest gotcha in building Sahara — documented here so others skip the pain.
+
+### 4. Run the backend proxy
+```bash
+python -m uvicorn agent.server:app --reload --port 8000
+```
+Check `http://127.0.0.1:8000/healthz` → `{"ok": true, "agent": "sahara-agent"}`.
+> Use `python -m uvicorn` (not bare `uvicorn`) so it runs inside the venv where the dependencies live.
+
+### 5. Run the frontend
+Put `App.jsx`, `sahara.css`, and `main.jsx` into a Vite React app's `src/`:
+```bash
+npm create vite@latest sahara-app -- --template react
+cd sahara-app && npm install
+# replace src/App.jsx, src/main.jsx; add src/sahara.css
+npm run dev
+```
+No Tailwind required — `sahara.css` defines the utility classes. `API_BASE` in `App.jsx` defaults to `http://localhost:8000`. Open the printed URL (e.g. `http://localhost:5173`), and **unlock the calculator by typing `1234` then `=`**.
+
+### Quick end-to-end test (no frontend needed)
+```bash
+curl -X POST http://localhost:8000/api/incident \
+  -H "Content-Type: application/json" \
+  -d '{"text": "He hit me and locked me out of the house last night", "language": "English"}'
+```
+Expect JSON with a `risk_level` and `rights` carrying citations like `PWDVA 2005, s.17`.
 
 ## Safety design decisions (read before judging the demo)
 
@@ -130,10 +143,29 @@ Point `API_BASE` in `frontend/sahara.jsx` at the proxy (default `http://localhos
 - **Sahara is not an emergency service** and says so persistently. In immediate danger: **112**.
 - A production deployment would add: counselor-in-the-loop escalation with a partner NGO, DPDP Act-compliant data handling, penetration testing of the disguise, and regional-language voice input.
 
- 
+## Demo video script (3 min)
 
-## Team
-*Shivakumar.Erangala*
+1. (0:00) Cold open: phone home screen, tap the calculator. NFHS-5 stat overlay: "1 in 3 married women in India experience spousal violence."
+2. (0:20) Type `1234`, press `=` — the calculator unlocks into Sahara. "To anyone else, it's just a calculator."
+3. (0:40) Live demo, fictional incident → validation + risk badge + cited rights; zoom on a citation chip (`PWDVA 2005, s.17`). "Retrieved from the actual statute, not model memory."
+4. (1:30) Fictional high-risk incident (threat to kill) → urgent 112/181 banner. Explain the lethality-indicator triage.
+5. (2:00) Records tab — the dated evidence pattern; the delete control.
+6. (2:20) The fail-closed case: an out-of-scope question → "I don't know" → routed to 181. "During development we caught the model inventing statute citations when retrieval failed — so we redesigned it to fail closed."
+7. (2:40) Architecture diagram + a Foundry **trace** showing `knowledge_base_retrieve` firing. Esc → back to calculator. Card: "All scenarios fictional. No real survivor data used."
+
+## Builder
+
+Built solo by **Shivakumar Erangala** for the Agents League Hackathon 2026,
+with AI-assisted development.
+
+Pilot conversations are *planned* with contacts at the Telangana State
+Commission for Women to guide what "safe and useful" means in practice — see
+the roadmap. Sahara is a working prototype and is deliberately **not deployed
+to real survivors**: responsible rollout requires safety red-teaming, expert
+review of the triage logic, hardened privacy, and counselor-in-the-loop
+escalation through a partner organisation first.
 
 ## License
-MIT — built for the Agents League Hackathon 2026.
+
+MIT — see [LICENSE](LICENSE). © 2026 Shivakumar Erangala.
+
