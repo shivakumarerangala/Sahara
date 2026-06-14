@@ -26,20 +26,32 @@ The most dangerous moment for a survivor is when her abuser discovers she is see
 
 ## Architecture
 
- 
+```mermaid
+flowchart LR
+    subgraph Device["Survivor's phone / browser"]
+        CALC["Calculator disguise<br/>(unlock code + quick exit)"] --> UI["Sahara React app"]
+    end
+
+    UI -->|"incident text (anonymous)"| API["FastAPI proxy<br/>(server.py)"]
+
+    subgraph Foundry["Microsoft Foundry"]
+        API -->|"Responses API +<br/>agent_reference"| AGENT["Sahara Agent<br/>(Foundry Agent Service)<br/>triage → retrieve → respond"]
+        AGENT <-->|"MCP: knowledge_base_retrieve"| KB["Foundry IQ knowledge base<br/>(Azure AI Search agentic retrieval)"]
+    end
+
+    subgraph Corpus["Azure Blob Storage corpus"]
+        PWDVA["PWDVA 2005 full text"]
+        BNS["BNS sections"]
+        OSC["One Stop Centre directory"]
+        SAFE["Helplines & safety planning"]
+    end
+
+    KB --- Corpus
+    AGENT -->|"JSON: acknowledgment, risk,<br/>cited rights, next steps"| API --> UI
+``` 
 
 **Why Foundry IQ is central, not bolted on:** the knowledge base's agentic retrieval plans subqueries, runs them in parallel, semantically reranks, and returns extractive passages **with citations** — so every legal statement Sahara makes traces back to the statute itself. The agent's instructions forbid answering legal questions from model memory.
 
-## How this maps to the judging rubric
-
-| Criterion | How Sahara delivers |
-|---|---|
-| **Accuracy & Relevance (20%)** | Reasoning Agents track + required Foundry IQ integration. Legal answers are extracted from the actual PWDVA/BNS text with citations, never from model memory. |
-| **Reasoning & Multi-step Thinking (20%)** | Explicit triage → retrieve → respond pipeline; the demo shows the agent's retrieval activity and how risk level changes the response plan. |
-| **Reliability & Safety (20%)** | Grounded-or-route-to-human design ("I don't know" → 181 helpline), lethality-indicator triage, disguise + quick exit, no on-device storage, anonymous by default, no auto-reporting (survivor keeps control). |
-| **Creativity & Originality (15%)** | A reasoning agent hidden inside a working calculator; evidence journal as a by-product of simply being heard. |
-| **UX & Presentation (15%)** | Calm, low-stimulation design; three taps from calculator to a cited answer; English/Hindi/Marathi. |
-| **Community vote (10%)** | Hack-for-Good story shared on the Agents League Discord with demo GIF. |
 
 ## Repository layout
 
@@ -143,15 +155,7 @@ Expect JSON with a `risk_level` and `rights` carrying citations like `PWDVA 2005
 - **Sahara is not an emergency service** and says so persistently. In immediate danger: **112**.
 - A production deployment would add: counselor-in-the-loop escalation with a partner NGO, DPDP Act-compliant data handling, penetration testing of the disguise, and regional-language voice input.
 
-## Demo video script (3 min)
 
-1. (0:00) Cold open: phone home screen, tap the calculator. NFHS-5 stat overlay: "1 in 3 married women in India experience spousal violence."
-2. (0:20) Type `1234`, press `=` — the calculator unlocks into Sahara. "To anyone else, it's just a calculator."
-3. (0:40) Live demo, fictional incident → validation + risk badge + cited rights; zoom on a citation chip (`PWDVA 2005, s.17`). "Retrieved from the actual statute, not model memory."
-4. (1:30) Fictional high-risk incident (threat to kill) → urgent 112/181 banner. Explain the lethality-indicator triage.
-5. (2:00) Records tab — the dated evidence pattern; the delete control.
-6. (2:20) The fail-closed case: an out-of-scope question → "I don't know" → routed to 181. "During development we caught the model inventing statute citations when retrieval failed — so we redesigned it to fail closed."
-7. (2:40) Architecture diagram + a Foundry **trace** showing `knowledge_base_retrieve` firing. Esc → back to calculator. Card: "All scenarios fictional. No real survivor data used."
 
 ## Builder
 
