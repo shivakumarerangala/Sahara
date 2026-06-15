@@ -52,7 +52,8 @@ flowchart LR
 
 **Why Foundry IQ is central, not bolted on:** the knowledge base's agentic retrieval plans subqueries, runs them in parallel, semantically reranks, and returns extractive passages **with citations** — so every legal statement Sahara makes traces back to the statute itself. The agent's instructions forbid answering legal questions from model memory.
 
-
+## Demo link:
+https://youtu.be/uUfwN1MZEcc
 ## Repository layout
 
 ```
